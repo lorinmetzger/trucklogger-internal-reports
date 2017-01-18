@@ -1,8 +1,11 @@
 package com.trucklogger.internal.reports;
 
+import com.trucklogger.transportation.assets.Driver;
+
 import javax.inject.Inject;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +27,7 @@ public class DailyRegistrationReport {
     Date yesterday = TimeUtil.yesterday();
     Date start = TimeUtil.startOfDay(yesterday);
     Date end = TimeUtil.endOfDay(yesterday);
-    logger.info("Date range [" + start + ", " + end + "].");   
+    List<Driver> drivers = driverRepository.findByCreatedDateGreaterThanAndCreatedDateLessThan(start, end);
+    logger.info("Date range [" + start + ", " + end + "] found [" + drivers.size() + "].");   
   }
 }

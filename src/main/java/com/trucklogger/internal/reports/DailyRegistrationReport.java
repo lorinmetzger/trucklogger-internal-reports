@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.Calendar;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,15 +44,11 @@ public class DailyRegistrationReport {
   @Inject
   private EmailService emailService;
 
-  @Scheduled(fixedRate = 15000)
-  public void reportCurrentTime() {
-    Date yesterday = TimeUtil.yesterday();
-    Date start = TimeUtil.startOfDay(yesterday);
-    Date end = TimeUtil.endOfDay(yesterday);
-    List<Driver> drivers = driverRepository.findByCreatedDateGreaterThanAndCreatedDateLessThan(start, end);
-    logger.info("Date range [" + start + ", " + end + "] found [" + drivers.size() + "].");   
-    List<LogEvent> events = logEventRepository.findByTimeGreaterThan(
-        (start.getTime() - (7 * 24 * 60 * 60000)));
+  private SimpleDateFormat format = new SimpleDateFormat("EEE, MMM d");
+
+  private Set<String> getActiveUsersAfter(Long dateTime)
+  {
+    List<LogEvent> events = logEventRepository.findByTimeGreaterThan(dateTime);
     Set<String> active = new HashSet<String>();
     if( events != null )
     {
@@ -60,25 +57,47 @@ public class DailyRegistrationReport {
         active.add( event.getUuid() );
       }
     }
-    logger.info("Active users in the past 7 days. [" + active.size() + "].");
-try {
-    final Email email = EmailImpl.builder()
-      .from(new InternetAddress("lmetzger@trucklogger.com", "Lorin's Rebot"))
-      .to(Lists.newArrayList(new InternetAddress("lorinmetzger@gmail.com", "Lorin Metzger")))
-      .subject("Daily Report")
-      .attachments(new ArrayList<EmailAttachmentImpl>())
-      .body("")//Empty body
-      .encoding(Charset.forName("UTF-8")).build();
-    //Defining the model object for the given Freemarker template
-    final Map<String, Object> modelObject = new HashMap<>();
-    modelObject.put("name", "Lorin");
-    modelObject.put("date", "Jan 19th");
-    modelObject.put("registrations", String.format("%d", drivers.size()));
-    modelObject.put("dailyusers", "120");
-    modelObject.put("weeklyusers", String.format("%d", active.size()));
-    emailService.send(email, "daily_report.ftl", modelObject);
-} catch(Exception exp) {
-  logger.error("", exp);
-}
+    return active;
+  }
+
+  @Scheduled(fixedRate = 120000)
+  public void reportCurrentTime() {
+    if( FileMarker.isMarkerOlderThan("dailyregistration", (System.currentTimeMillis() - (23 * 60 * 60000))) &&
+        Calendar.getInstance().get(Calendar.HOUR_OF_DAY) > 8 )
+    {
+      Date yesterday = TimeUtil.yesterday();
+      Date start = TimeUtil.startOfDay(yesterday);
+      Date end = TimeUtil.endOfDay(yesterday);
+      List<Driver> drivers = driverRepository.findByCreatedDateGreaterThanAndCreatedDateLessThan(start, end);
+      logger.info("Date range [" + start + ", " + end + "] found [" + drivers.size() + "].");
+      Set<String> dailyActive = getActiveUsersAfter(start.getTime());
+      Set<String> weeklyActive = getActiveUsersAfter(start.getTime() - (7 * 24 * 60 * 60000));
+      Map<String, String> receipt = new HashMap<String, String>();
+      receipt.put("lorinmetzger@gmail.com", "Lorin Metzger");
+      receipt.put("schmitt.bob@gmail.com", "Bob Schmitt"); 
+      try {
+        for(String addr : receipt.keySet())
+        {
+          final Email email = EmailImpl.builder()
+            .from(new InternetAddress("lmetzger@trucklogger.com", "Lorin's Rebot"))
+            .to(Lists.newArrayList(new InternetAddress(addr, receipt.get(addr))))
+            .subject("Daily Report")
+            .attachments(new ArrayList<EmailAttachmentImpl>())
+            .body("")//Empty body
+            .encoding(Charset.forName("UTF-8")).build();
+          //Defining the model object for the given Freemarker template
+          final Map<String, Object> modelObject = new HashMap<>();
+          modelObject.put("name", receipt.get(addr));
+          modelObject.put("date", format.format(start));
+          modelObject.put("registrations", String.format("%d", drivers.size()));
+          modelObject.put("dailyusers", dailyActive.size());
+          modelObject.put("weeklyusers", String.format("%d", weeklyActive.size()));
+          emailService.send(email, "daily_report.ftl", modelObject);
+          FileMarker.createMarker("dailyregistration");
+        }
+      } catch(Exception exp) {
+        logger.error("", exp);
+      }
+    }
   }
 }

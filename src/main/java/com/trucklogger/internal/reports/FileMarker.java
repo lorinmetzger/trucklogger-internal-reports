@@ -7,13 +7,13 @@ import java.io.File;
 public class FileMarker
 {
 
-  public boolean isMarkerOlderThan(String marker, long timestamp)
+  public static boolean isMarkerOlderThan(String marker, long timestamp)
   {
     File file = new File(marker);
     return (file.exists() && (file.lastModified() < timestamp));
   }
  
-  public void createMarker(String marker) throws Exception
+  public static void createMarker(String marker) throws Exception
   {
     FileUtils.touch(new File(marker));
   }

@@ -54,7 +54,7 @@ public class DailyRegistrationReport {
     {
       for(LogEvent event : events)
       {
-        active.add( event.getUuid() );
+        active.add( event.getAssetUuid() );
       }
     }
     return active;

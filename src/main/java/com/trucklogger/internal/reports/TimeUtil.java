@@ -9,6 +9,11 @@ public class TimeUtil
   {
     return new Date((System.currentTimeMillis() - (24 * 60 * 60000)));
   }
+  
+  public static Date theDayBeforeYesterday()
+  {
+    return new Date((System.currentTimeMillis() - (48 * 60 * 60000)));
+  }
 
   public static Date startOfDay(Date day)
   {
